@@ -8,6 +8,35 @@ This sample app uses the [Vercel MCP Adapter](https://www.npmjs.com/package/mcp-
 
 Update `app/[transport]/route.ts` with your tools, prompts, and resources following the [MCP TypeScript SDK documentation](https://github.com/modelcontextprotocol/typescript-sdk/tree/main?tab=readme-ov-file#server).
 
+## SL Transit tools
+
+This server exposes SL (Stockholm) departures via MCP tools:
+
+- `sl_find_site` (search for SL site IDs)
+- `sl_departures` (get departures by station name or siteId)
+
+Requests require `MCP_API_KEY` sent as `Authorization: Bearer <key>` or `x-api-key: <key>`.
+
+### How to use in Poke
+
+Poke can connect to either endpoint:
+
+- `/mcp`
+- `/api/mcp` (alias for compatibility)
+
+Example Poke prompts:
+
+- “Find SL site IDs for T-Centralen.”
+- “Show departures from T-Centralen, metro and train only.”
+- “Departures from siteId 9001, max 10 results, destination contains ‘Södertälje’.”
+
+### Manual test steps
+
+1. Set `MCP_API_KEY` in your environment.
+2. Start the dev server: `pnpm dev`
+3. In Poke (or another MCP client), connect to `http://localhost:3000/mcp`.
+4. Invoke `sl_find_site` and `sl_departures` with the prompts above.
+
 ## Notes for running on Vercel
 
 - To use the SSE transport, requires a Redis attached to the project under `process.env.REDIS_URL` and toggling the `disableSse` flag to `false` in `app/mcp/route.ts`
