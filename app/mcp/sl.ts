@@ -1,12 +1,14 @@
-const SL_SITES_URL = "https://transport.integration.sl.se/v1/sites";
+// SL Transport endpoints are public; no API key required.
+const SL_SITES_URL = "https://transport.integration.sl.se/v1/sites?expand=true";
 const SL_DEPARTURES_URL = (siteId: number) =>
   `https://transport.integration.sl.se/v1/sites/${siteId}/departures`;
 const STOCKHOLM_TIMEZONE = "Europe/Stockholm";
-const SITES_CACHE_KEY = "sl:sites:v1";
+const SITES_CACHE_KEY = "sl:sites:v3";
 
 type Site = {
   siteId: number;
   name: string;
+  modes: string[];
 };
 
 type RawDeparture = Record<string, unknown>;
@@ -99,18 +101,33 @@ const fetchSitesFromApi = async (): Promise<Site[]> => {
     throw new Error(`SL sites request failed with ${response.status}.`);
   }
   const data = (await response.json()) as Array<{
-    siteId?: number | string;
+    id?: number | string;
     name?: string;
+    stop_areas?: Array<{
+      transport_mode?: string | null;
+    }> | null;
   }>;
   if (!Array.isArray(data)) {
     throw new Error("Unexpected SL sites response.");
   }
   return data
     .map((site) => ({
-      siteId: Number(site.siteId),
+      // SL returns id/gid; our internal siteId is derived from id.
+      siteId: Number(site.id),
       name: String(site.name ?? "").trim(),
+      modes: Array.from(
+        new Set(
+          (site.stop_areas ?? [])
+            .map((stopArea) => stopArea.transport_mode)
+            .filter(Boolean)
+        )
+      ),
     }))
-    .filter((site) => Number.isFinite(site.siteId) && site.name.length > 0);
+    .filter(
+      (site) =>
+        Number.isFinite(site.siteId) &&
+        site.name.length > 0
+    );
 };
 
 const getKv = async () => {

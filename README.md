@@ -10,7 +10,7 @@ Update `app/[transport]/route.ts` with your tools, prompts, and resources follow
 
 ## SL Transit tools
 
-This server exposes SL (Stockholm) departures via MCP tools:
+This server exposes SL (Stockholm) departures via MCP tools using the SL Transport API (no SL API key required). Site IDs are derived from the API's `id` field:
 
 - `sl_find_site` (search for SL site IDs)
 - `sl_departures` (get departures by station name or siteId)
