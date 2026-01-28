@@ -111,18 +111,22 @@ const fetchSitesFromApi = async (): Promise<Site[]> => {
     throw new Error("Unexpected SL sites response.");
   }
   return data
-    .map((site) => ({
-      // SL returns id/gid; our internal siteId is derived from id.
-      siteId: Number(site.id),
-      name: String(site.name ?? "").trim(),
-      modes: Array.from(
+    .map((site) => {
+      const modes = Array.from(
         new Set(
           (site.stop_areas ?? [])
             .map((stopArea) => stopArea.transport_mode)
-            .filter(Boolean)
+            .filter((mode): mode is string => typeof mode === "string" && mode.length > 0)
         )
-      ),
-    }))
+      );
+
+      return {
+        // SL returns id/gid; our internal siteId is derived from id.
+        siteId: Number(site.id),
+        name: String(site.name ?? "").trim(),
+        modes,
+      };
+    })
     .filter(
       (site) =>
         Number.isFinite(site.siteId) &&
