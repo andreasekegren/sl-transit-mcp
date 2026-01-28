@@ -67,20 +67,39 @@ const handler = createMcpHandler(
       {
         title: "sl_departures",
         description: "Get SL departures for a station name or siteId.",
-        inputSchema: z
-          .object({
-            station: z.string().min(1).optional(),
-            siteId: z.coerce.number().int().optional(),
-            id: z.coerce.number().int().optional(),
+        inputSchema: (() => {
+          const slDeparturesCommon = z.object({
             maxResults: z.number().int().min(1).max(30).optional(),
             modes: z.array(z.string()).optional(),
             directionContains: z.string().min(1).optional(),
-          })
-          .refine((data) => data.station || data.siteId || data.id, {
-            message: "Provide station or siteId (or id).",
-          }),
+          });
+
+          const slDeparturesByStation = slDeparturesCommon.extend({
+            station: z.string().min(1),
+          });
+
+          const slDeparturesBySiteId = slDeparturesCommon.extend({
+            siteId: z.coerce.number().int(),
+          });
+
+          const slDeparturesById = slDeparturesCommon.extend({
+            id: z.coerce.number().int(),
+          });
+
+          return z.union([
+            slDeparturesByStation,
+            slDeparturesBySiteId,
+            slDeparturesById,
+          ]);
+        })(),
       },
-      async ({ station, siteId, id, maxResults, modes, directionContains }) => {
+      async (params) => {
+        const station = "station" in params ? params.station : undefined;
+        const siteId = "siteId" in params ? params.siteId : undefined;
+        const id = "id" in params ? params.id : undefined;
+        const maxResults = params.maxResults;
+        const modes = params.modes;
+        const directionContains = params.directionContains;
         const limit = maxResults ?? 8;
         const filterModes = normalizeModesFilter(modes ?? []);
         const ignoredModes = filterModes.ignoredModes;
