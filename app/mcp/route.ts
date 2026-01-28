@@ -39,7 +39,7 @@ const handler = createMcpHandler(
           }
 
           const lines = matches.map(
-            (site) => `${site.name} (siteId ${site.siteId})`
+            (site) => `${site.name} (id: ${site.siteId})`
           );
           return {
             content: [
@@ -70,21 +70,22 @@ const handler = createMcpHandler(
         inputSchema: z
           .object({
             station: z.string().min(1).optional(),
-            siteId: z.number().int().optional(),
+            siteId: z.coerce.number().int().optional(),
+            id: z.coerce.number().int().optional(),
             maxResults: z.number().int().min(1).max(30).optional(),
             modes: z.array(z.string()).optional(),
             directionContains: z.string().min(1).optional(),
           })
-          .refine((data) => data.station || data.siteId, {
-            message: "Provide station or siteId.",
+          .refine((data) => data.station || data.siteId || data.id, {
+            message: "Provide station or siteId (or id).",
           }),
       },
-      async ({ station, siteId, maxResults, modes, directionContains }) => {
+      async ({ station, siteId, id, maxResults, modes, directionContains }) => {
         const limit = maxResults ?? 8;
         const filterModes = normalizeModesFilter(modes ?? []);
         const ignoredModes = filterModes.ignoredModes;
 
-        let resolvedSiteId = siteId;
+        let resolvedSiteId = siteId ?? id;
         let resolvedSiteName = "";
 
         try {
@@ -94,12 +95,12 @@ const handler = createMcpHandler(
             if (match.candidates) {
               const candidates = match.candidates
                 .slice(0, 5)
-                .map((site) => `${site.name} (siteId ${site.siteId})`);
+                .map((site) => `${site.name} (id: ${site.siteId})`);
               return {
                 content: [
                   {
                     type: "text",
-                    text: `Multiple SL sites match "${station}". Please refine your station name or pass a siteId.\n${candidates.join("\n")}`,
+                    text: `Multiple SL sites match "${station}". Please refine your station name or pass a siteId (or id).\n${candidates.join("\n")}`,
                   },
                 ],
               };
@@ -123,7 +124,7 @@ const handler = createMcpHandler(
               content: [
                 {
                   type: "text",
-                  text: "No siteId resolved. Provide a station name or siteId.",
+                  text: "No siteId resolved. Provide a station name or siteId (or id).",
                 },
               ],
             };
@@ -160,7 +161,7 @@ const handler = createMcpHandler(
 
           const headerLines = [];
           if (resolvedSiteName) {
-            headerLines.push(`Departures for ${resolvedSiteName} (siteId ${resolvedSiteId})`);
+            headerLines.push(`Departures for ${resolvedSiteName} (id: ${resolvedSiteId})`);
           }
           if (ignoredModes.length > 0) {
             headerLines.push(
