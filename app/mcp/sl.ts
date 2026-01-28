@@ -41,6 +41,17 @@ const timeFormatter = new Intl.DateTimeFormat("sv-SE", {
   hour12: false,
 });
 
+const stockholmPartsFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: STOCKHOLM_TIMEZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
 const SUPPORTED_MODES = new Set([
   "BUS",
   "METRO",
@@ -54,6 +65,64 @@ const hasKvConfig = () =>
     process.env.KV_REST_API_URL &&
       (process.env.KV_REST_API_TOKEN || process.env.KV_REST_API_READ_ONLY_TOKEN)
   );
+
+const getStockholmOffsetMinutes = (date: Date): number => {
+  const parts = stockholmPartsFormatter.formatToParts(date);
+  const partMap = parts.reduce<Record<string, string>>((acc, part) => {
+    if (part.type !== "literal") {
+      acc[part.type] = part.value;
+    }
+    return acc;
+  }, {});
+  const year = Number(partMap.year);
+  const month = Number(partMap.month);
+  const day = Number(partMap.day);
+  const hour = Number(partMap.hour);
+  const minute = Number(partMap.minute);
+  const second = Number(partMap.second);
+  const stockholmAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  return (stockholmAsUtc - date.getTime()) / 60_000;
+};
+
+const NAIVE_ISO_REGEX =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/;
+
+const parseNaiveIsoAsStockholm = (iso: string): Date | null => {
+  const match = iso.match(NAIVE_ISO_REGEX);
+  if (!match) {
+    return null;
+  }
+  const [
+    ,
+    yearValue,
+    monthValue,
+    dayValue,
+    hourValue,
+    minuteValue,
+    secondValue,
+    millisecondValue,
+  ] = match;
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  const hour = Number(hourValue);
+  const minute = Number(minuteValue);
+  const second = secondValue ? Number(secondValue) : 0;
+  const millisecond = millisecondValue
+    ? Number(millisecondValue.padEnd(3, "0"))
+    : 0;
+  const guessUtc = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
+  if (Number.isNaN(guessUtc)) {
+    return null;
+  }
+  const firstOffset = getStockholmOffsetMinutes(new Date(guessUtc));
+  let correctedUtc = guessUtc - firstOffset * 60_000;
+  const secondOffset = getStockholmOffsetMinutes(new Date(correctedUtc));
+  if (secondOffset !== firstOffset) {
+    correctedUtc = guessUtc - secondOffset * 60_000;
+  }
+  return new Date(correctedUtc);
+};
 
 const parseTimeValue = (value: unknown): Date | null => {
   if (typeof value === "number") {
@@ -69,6 +138,10 @@ const parseTimeValue = (value: unknown): Date | null => {
   }
   if (/^\d+$/.test(trimmed)) {
     return new Date(Number(trimmed));
+  }
+  const stockholmDate = parseNaiveIsoAsStockholm(trimmed);
+  if (stockholmDate) {
+    return stockholmDate;
   }
   const date = new Date(trimmed);
   return Number.isNaN(date.getTime()) ? null : date;
