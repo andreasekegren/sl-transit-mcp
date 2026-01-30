@@ -11,15 +11,15 @@ import {
 
 const departuresSchema = z
   .object({
-    siteId: z.coerce.number().int().optional(),
-    id: z.coerce.number().int().optional(),
+    siteId: z.coerce
+      .number()
+      .int()
+      .describe("SL siteId (use sl_find_site to look it up)."),
     maxResults: z.number().int().min(1).max(30).optional(),
     modes: z.array(z.string()).optional(),
     directionContains: z.string().min(1).optional(),
   })
-  .refine((data) => data.siteId !== undefined || data.id !== undefined, {
-    message: "Provide siteId (or id).",
-  });
+  .strict();
 
 // StreamableHttp server
 const handler = createMcpHandler(
@@ -80,27 +80,13 @@ const handler = createMcpHandler(
         description: "Get SL departures for a siteId.",
         inputSchema: departuresSchema,
       },
-      async (params) => {
-        const { maxResults, modes, directionContains } = params;
-        const siteId = params.siteId ?? params.id;
+      async ({ siteId, maxResults, modes, directionContains }) => {
         const limit = maxResults ?? 8;
         const filterModes = normalizeModesFilter(modes ?? []);
         const ignoredModes = filterModes.ignoredModes;
 
-        const resolvedSiteId = siteId;
-        if (resolvedSiteId === undefined) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: "Provide siteId (or id).",
-              },
-            ],
-          };
-        }
-
         try {
-          const departures = await fetchDepartures(resolvedSiteId);
+          const departures = await fetchDepartures(siteId);
           const filtered = departures
             .filter((departure) => {
               if (filterModes.filterSet.size === 0) {
@@ -130,7 +116,7 @@ const handler = createMcpHandler(
           }
 
           const headerLines = [];
-          headerLines.push(`Departures for site ${resolvedSiteId}`);
+          headerLines.push(`Departures for site ${siteId}`);
           if (ignoredModes.length > 0) {
             headerLines.push(
               `Ignored unsupported modes: ${ignoredModes.join(", ")}.`
