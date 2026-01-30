@@ -9,6 +9,18 @@ import {
   normalizeModesFilter,
 } from "./sl";
 
+const departuresSchema = z
+  .object({
+    siteId: z.coerce.number().int().optional(),
+    id: z.coerce.number().int().optional(),
+    maxResults: z.number().int().min(1).max(30).optional(),
+    modes: z.array(z.string()).optional(),
+    directionContains: z.string().min(1).optional(),
+  })
+  .refine((data) => data.siteId !== undefined || data.id !== undefined, {
+    message: "Provide siteId (or id).",
+  });
+
 // StreamableHttp server
 const handler = createMcpHandler(
   async (server) => {
@@ -38,7 +50,7 @@ const handler = createMcpHandler(
           }
 
           const lines = matches.map(
-            (site) => `${site.name} (id: ${site.siteId})`
+            (site) => `${site.name} (siteId: ${site.siteId})`
           );
           return {
             content: [
@@ -66,22 +78,26 @@ const handler = createMcpHandler(
       {
         title: "sl_departures",
         description: "Get SL departures for a siteId.",
-        inputSchema: z
-          .object({
-            siteId: z.coerce.number().int(),
-            maxResults: z.number().int().min(1).max(30).optional(),
-            modes: z.array(z.string()).optional(),
-            directionContains: z.string().min(1).optional(),
-          })
-          .strict(),
+        inputSchema: departuresSchema,
       },
       async (params) => {
-        const { siteId, maxResults, modes, directionContains } = params;
+        const { maxResults, modes, directionContains } = params;
+        const siteId = params.siteId ?? params.id;
         const limit = maxResults ?? 8;
         const filterModes = normalizeModesFilter(modes ?? []);
         const ignoredModes = filterModes.ignoredModes;
 
         const resolvedSiteId = siteId;
+        if (resolvedSiteId === undefined) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Provide siteId (or id).",
+              },
+            ],
+          };
+        }
 
         try {
           const departures = await fetchDepartures(resolvedSiteId);
