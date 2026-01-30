@@ -7,7 +7,6 @@ import {
   getSites,
   normalizeDepartureMode,
   normalizeModesFilter,
-  resolveSiteMatch,
 } from "./sl";
 
 // StreamableHttp server
@@ -66,7 +65,7 @@ const handler = createMcpHandler(
       "sl_departures",
       {
         title: "sl_departures",
-        description: "Get SL departures for a station name or siteId.",
+        description: "Get SL departures for a siteId.",
         inputSchema: z
           .object({
             siteId: z.coerce.number().int(),
@@ -77,57 +76,14 @@ const handler = createMcpHandler(
           .strict(),
       },
       async (params) => {
-        const { station, siteId, id, maxResults, modes, directionContains } =
-          params;
+        const { siteId, maxResults, modes, directionContains } = params;
         const limit = maxResults ?? 8;
         const filterModes = normalizeModesFilter(modes ?? []);
         const ignoredModes = filterModes.ignoredModes;
 
-        let resolvedSiteId = siteId ?? id;
-        let resolvedSiteName = "";
+        const resolvedSiteId = siteId;
 
         try {
-          if (!resolvedSiteId && station) {
-            const sites = await getSites();
-            const match = resolveSiteMatch(sites, station);
-            if (match.candidates) {
-              const candidates = match.candidates
-                .slice(0, 5)
-                .map((site) => `${site.name} (id: ${site.siteId})`);
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: `Multiple SL sites match "${station}". Please refine your station name or pass a siteId (or id).\n${candidates.join("\n")}`,
-                  },
-                ],
-              };
-            }
-            if (!match.site) {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: `No SL site found for "${station}". Try a different spelling or use sl_find_site to browse options.`,
-                  },
-                ],
-              };
-            }
-            resolvedSiteId = match.site.siteId;
-            resolvedSiteName = match.site.name;
-          }
-
-          if (!resolvedSiteId) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: "No siteId resolved. Provide a station name or siteId (or id).",
-                },
-              ],
-            };
-          }
-
           const departures = await fetchDepartures(resolvedSiteId);
           const filtered = departures
             .filter((departure) => {
@@ -151,16 +107,14 @@ const handler = createMcpHandler(
               content: [
                 {
                   type: "text",
-                  text: `No departures found${resolvedSiteName ? ` for ${resolvedSiteName}` : ""} with the requested filters.`,
+                  text: "No departures found with the requested filters.",
                 },
               ],
             };
           }
 
           const headerLines = [];
-          if (resolvedSiteName) {
-            headerLines.push(`Departures for ${resolvedSiteName} (id: ${resolvedSiteId})`);
-          }
+          headerLines.push(`Departures for site ${resolvedSiteId}`);
           if (ignoredModes.length > 0) {
             headerLines.push(
               `Ignored unsupported modes: ${ignoredModes.join(", ")}.`
