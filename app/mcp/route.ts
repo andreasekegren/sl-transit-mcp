@@ -69,16 +69,12 @@ const handler = createMcpHandler(
         description: "Get SL departures for a station name or siteId.",
         inputSchema: z
           .object({
-            station: z.string().min(1).optional(),
-            siteId: z.coerce.number().int().optional(),
-            id: z.coerce.number().int().optional(),
+            siteId: z.coerce.number().int(),
             maxResults: z.number().int().min(1).max(30).optional(),
             modes: z.array(z.string()).optional(),
             directionContains: z.string().min(1).optional(),
           })
-          .refine((data) => data.station || data.siteId || data.id, {
-            message: "Provide a station name or siteId (or id).",
-          }),
+          .strict(),
       },
       async (params) => {
         const { station, siteId, id, maxResults, modes, directionContains } =
